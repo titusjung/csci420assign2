@@ -88,7 +88,7 @@ int loadSplines(char *argv) {
 
 	return 0;
 }
-
+/*
 glm::vec3 crSplines(int s,float u, glm::vec3 point1, glm::vec3 point2, glm::vec3 point3, glm::vec3 point4)
 {
 	glm::mat4x3 control = glm::mat4x3(point1,point2,point3,point4);
@@ -110,7 +110,7 @@ glm::vec3 crSplines(int s,float u, glm::vec3 point1, glm::vec3 point2, glm::vec3
 
 	return preresult*control;
 
-}
+}*/
 
 int _tmain(int argc, _TCHAR* argv[])
 {
