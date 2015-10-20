@@ -16,6 +16,7 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 #include <chrono>
+#include <math.h>
 
 /* represents one control point along the spline */
 struct point {
@@ -32,11 +33,25 @@ struct spline {
 /* the spline array */
 struct spline *g_Splines;
 point crSplines(float s, float u, point p1, point p2, point p3, point p4);
+point getUnit(point p1, point p2);
+void takeRide();
+point arithVector(bool isaPos, point a, bool isbPos, point b);
+
+point getTangent(float s, float u, point p1, point p2, point p3, point p4);
+
 void texload(int i, char *filename);
 /* total number of splines */
 int g_iNumOfSplines;
 
 int g_iMenuId;
+
+bool isRCrun = false;
+int rideControlPoint=0;
+float rideFP=0.f;
+
+point rtan;
+point rp0, rp1, rp2, rp3;
+point binormalOld;
 
 int g_vMousePos[2] = { 0, 0 };
 int g_iLeftMouseButton = 0;    /* 1 if pressed, 0 if not */
@@ -189,36 +204,101 @@ void display()
 //	glPushMatrix();
 	glLoadIdentity(); // reset transformation
 
+	if (isRCrun) takeRide();
+	
 	glTranslatef(-g_vLandTranslate[0], -g_vLandTranslate[1], -g_vLandTranslate[2]);
 	glRotatef(g_vLandRotate[0], 1, 0, 0);
 	glRotatef(g_vLandRotate[1], 0, 1, 0);
 	glRotatef(g_vLandRotate[2], 0, 0, 1);
 	glScalef(g_vLandScale[0], g_vLandScale[1], g_vLandScale[2]);
-
+	
 	//enableLights();
-	float s=0.5; 
+	float s=0.5f; 
 	point buff;
 	point p0,p1,p2,p3; 
-	p0.x = 0;
-	p0.y = 0;
-	p0.z = 0;
+	p0 = g_Splines->points[0];
+	glLineWidth(1.5f);
+
+	point n0, b0, b1, v, t0,v0,v1,v2,v3,v4,v5,v6,v7;
+	bool start = false;
+	v.x = 1.f;
+	v.y = 1.f;
+	v.z = 1.f;
+	t0 = getTangent(0.5f, 0, p0, g_Splines->points[0], g_Splines->points[1], g_Splines->points[2]);
+	n0 = getUnit(t0, v);
+	b0 = getUnit(t0, n0);
 	for (int i = 0; i < g_Splines->numControlPoints; i++)
 	{
-		for (float u = 0.f; u < 1.f; u += 0.001f)
+
+		p1 = g_Splines->points[i];
+		p2 = g_Splines->points[(i + 1) % g_Splines->numControlPoints];
+		p3 = g_Splines->points[(i + 2) % g_Splines->numControlPoints];
+		glBegin(GL_LINES);
+
+		for (float u = 0.f; u < 1.f; u += 0.1f)
 		{
-			glBegin(GL_POINTS);
-			p1 = g_Splines->points[i];
-			p2 = g_Splines->points[(i + 1) % g_Splines->numControlPoints];
-			p3 = g_Splines->points[(i + 2) % g_Splines->numControlPoints];
+
+
 	
 			
 			buff = crSplines(s, u, p0, p1, p2, p3);
-
+			t0 = getTangent(s, u, p0, p1, p2, p3);
 			glColor3f(1.0,1.0, 1.0);
 			glVertex3f(buff.x, buff.y, buff.z);
-			glEnd();
-			p0 = p1;
+
+			n0 = getUnit(b0, t0);
+			b1 = getUnit(t0, n0);
+
+			if(start)
+			{
+				v4 = arithVector(true,buff, true,  arithVector(true, n0, false, b0));
+				v5 = arithVector(true, buff, true, arithVector(true, n0, true, b0));
+				v6 = arithVector(true, buff, true, arithVector(false, n0, true, b0));
+				v7 = arithVector(true, buff, true, arithVector(false, n0, false, b0));
+
+				glBegin(GL_POLYGON);
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v0.x, v0.y, v0.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v4.x, v4.y, v4.z);
+
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v5.x, v5.y, v5.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v1.x, v1.y, v1.z);
+				glEnd();
+
+
+
+				v0 = v4;
+				v1 = v5;
+				v2 = v6;
+				v3 = v7;
+			}
+			else
+			{
+				start = true;
+
+				v4 = arithVector(true, buff, true, arithVector(true, n0, false, b0));
+				v5 = arithVector(true, buff, true, arithVector(true, n0, true, b0));
+				v6 = arithVector(true, buff, true, arithVector(false, n0, true, b0));
+				v7 = arithVector(true, buff, true, arithVector(false, n0, false, b0));
+
+				v0 = v4;
+				v1 = v5;
+				v2 = v6;
+				v3 = v7;
+			}
+
+
+
 		}
+		p0 = p1;
+		glEnd();
+
 
 	}
 
@@ -248,6 +328,7 @@ void display()
 	glEnd();
 	glEndList();
 	glClearColor(0.0, 0.0, 0.0, 0.0);
+	
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, texture[0]);
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
@@ -256,23 +337,285 @@ void display()
 	glBegin(GL_POLYGON);
 	
 	glTexCoord2f(1.0, 0.0);
-	glVertex3f(1.0, 1.0, 1.0);
+	glVertex3f(5.0, 5.0, 5.0);
 
 	glTexCoord2f(0.0, 0.0);
-	glVertex3f(-1.0, 1.0, 1.0);
+	glVertex3f(-5.0, 5.0, 5.0);
 	
 	glTexCoord2f(0.0, 1.0);
-	glVertex3f(-1.0, 1.0, -1.0);
+	glVertex3f(-5.0, 5.0, -5.0);
 
 	glTexCoord2f(1.0, 1.0);
-	glVertex3f(1.0, 1.0, -1.0);
+	glVertex3f(5.0, 5.0, -5.0);
 	
 	glEnd();
+
+
+	glBindTexture(GL_TEXTURE_2D, texture[0]);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBegin(GL_POLYGON);
+
+	glTexCoord2f(1.0, 0.0);
+	glVertex3f(5.0, -5.0, 5.0);
+
+	glTexCoord2f(0.0, 0.0);
+	glVertex3f(-5.0, -5.0, 5.0);
+
+	glTexCoord2f(0.0, 1.0);
+	glVertex3f(-5.0, -5.0, -5.0);
+
+	glTexCoord2f(1.0, 1.0);
+	glVertex3f(5.0, -5.0, -5.0);
+
+	glEnd();
+
+
+	glBindTexture(GL_TEXTURE_2D, texture[0]);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBegin(GL_POLYGON);
+
+	glTexCoord2f(1.0, 0.0);
+	glVertex3f(5.0, 5.0, 5.0);
+
+	glTexCoord2f(0.0, 0.0);
+	glVertex3f(5.0, 5.0, -5.0);
+
+	glTexCoord2f(0.0, 1.0);
+	glVertex3f(5.0, -5.0, -5.0);
+
+	glTexCoord2f(1.0, 1.0);
+	glVertex3f(5.0, -5.0, 5.0);
+
+	glEnd();
+
+		glBindTexture(GL_TEXTURE_2D, texture[0]);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBegin(GL_POLYGON);
+
+	glTexCoord2f(1.0, 0.0);
+	glVertex3f(-5.0, 5.0, 5.0);
+
+	glTexCoord2f(0.0, 0.0);
+	glVertex3f(-5.0, 5.0, -5.0);
+
+	glTexCoord2f(0.0, 1.0);
+	glVertex3f(-5.0, -5.0, -5.0);
+
+	glTexCoord2f(1.0, 1.0);
+	glVertex3f(-5.0, -5.0, 5.0);
+
+	glEnd();
+
+	glBindTexture(GL_TEXTURE_2D, texture[0]);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBegin(GL_POLYGON);
+
+	glTexCoord2f(1.0, 0.0);
+	glVertex3f(5.0, 5.0, 5.0);
+
+	glTexCoord2f(0.0, 0.0);
+	glVertex3f(-5.0, 5.0, 5.0);
+
+	glTexCoord2f(0.0, 1.0);
+	glVertex3f(-5.00, -5.0, 5.0);
+
+	glTexCoord2f(1.0, 1.0);
+	glVertex3f(5.0, -5.0, 5.0);
+
+	glEnd();
+
+
+	glBindTexture(GL_TEXTURE_2D, texture[0]);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBegin(GL_POLYGON);
+
+	glTexCoord2f(1.0, 0.0);
+	glVertex3f(5.0, 5.0, -5.0);
+
+	glTexCoord2f(0.0, 0.0);
+	glVertex3f(-5.0, 5.0, -5.0);
+
+	glTexCoord2f(0.0, 1.0);
+	glVertex3f(-5.0, -5.0, -5.0);
+
+	glTexCoord2f(1.0, 1.0);
+	glVertex3f(5.0, -5.0, -5.0);
+
+	glEnd();
+
 	glDisable(GL_TEXTURE_2D);
 
 	glutSwapBuffers();
 	record();
 
+}
+
+void takeRide()
+{
+
+	point rtan;
+	float s = 0.5f;
+	if (rideFP > 1.f)
+	{
+		rideControlPoint++;
+		rideFP = 0.0f;
+		printf("control Point %d \n", rideControlPoint);
+		rp0 = rp1 = g_Splines->points[rideControlPoint-1];
+
+
+	}
+	if (rideControlPoint == g_Splines->numControlPoints)
+	{
+		isRCrun = false;
+		rideControlPoint = 0;
+		rideFP = 0.f;
+		return;
+	}
+	if (rideControlPoint == 0)
+	{		
+
+		rp0 = g_Splines->points[g_Splines->numControlPoints - 1];
+	}
+
+	
+	rp1 = g_Splines->points[rideControlPoint];
+	rp2 = g_Splines->points[(rideControlPoint + 1) % g_Splines->numControlPoints];
+	rp3 = g_Splines->points[(rideControlPoint + 2) % g_Splines->numControlPoints];
+
+	point currentp = crSplines(s, rideFP, rp0, rp1, rp2, rp3);
+	rtan = getTangent(s, rideFP, rp0, rp1, rp2, rp3);
+
+	if (rideFP==0.5f)printf("current locatin is  %f %f %f \n", currentp.x, currentp.y, currentp.z);
+	point binormalNew, norm;
+
+
+	if (rideFP==0.0f && rideControlPoint == 0)
+	{
+		//printf("initializing \n");
+
+		point vec;
+		vec.x = 0.0;
+		vec.y = 1.0;
+		vec.z = -1.0;
+		norm = getUnit(rtan, vec);
+		binormalNew = getUnit(rtan, norm);
+
+	}
+	else
+	{
+		norm = getUnit(binormalOld, rtan);
+		binormalNew = getUnit(rtan, norm);
+
+	}
+	binormalOld = binormalNew;
+
+	float focusPx = currentp.x + 100.f*rtan.x;
+	float focusPy = currentp.y + 100.f*rtan.y;
+	float focusPz = currentp.z +100.f*rtan.z;
+
+	gluLookAt(currentp.x, currentp.y, currentp.z, focusPx, focusPy, focusPz, norm.x, norm.y, norm.z);
+
+
+	rideFP += 0.1f;
+	
+}
+
+point crSplines(float s, float u, point p1, point p2, point p3, point p4)
+{
+
+	point output;
+	float u2 = u*u;
+	float u3 = u*u*u;
+	float a = -s*u + 2.0f * s*u*u - s*u*u*u;
+	float b = 1.f + (-3.0f + s)*u*u + (2.0f - s)*u*u*u;
+	float c = s*u + (3.0f - 2.0f* s)*u*u + (-2.0f + s)*u*u*u;
+	float d = -s*u*u + s*u*u*u;
+
+	output.x = (float)a*p1.x + (float)b*p2.x + (float)c*p3.x + (float)d*p4.x;
+	output.y = (float)a*p1.y + (float)b*p2.y + (float)c*p3.y + (float)d*p4.y;
+	output.z = (float)a*p1.z + (float)b*p2.z + (float)c*p3.z + (float)d*p4.z;
+
+	return output;
+
+}
+
+point getTangent(float s, float u, point p1, point p2, point p3, point p4)
+{
+
+	point output;
+	float u2 = u*u;
+	float a = -3.f * u2 + 4.f * u*s - s;
+	float b = 3.f*u2*(2.f - s) + 2.f*u*(s - 3.f);
+	float c = 3.f*u2*(s - 2.f) + 2.f*u*(3.f - 2.f*s) + s;
+	float d = 3.f*u2 - 2.f*u*s;
+
+	output.x = a*p1.x +b*p2.x + c*p3.x + d*p4.x;
+	output.y = a*p1.y + b*p2.y + c*p3.y +d*p4.y;
+	output.z = a*p1.z + b*p2.z +c*p3.z +d*p4.z;
+
+	return output;
+
+}
+
+point getUnit(point p1, point p2)
+{
+	float a1 = p1.x;
+	float a2 = p1.y;
+	float a3 = p1.z;
+
+	float b1 = p2.x;
+	float b2 = p2.y;
+	float b3 = p2.z;
+
+	float c1 = -a3 *b2 + a2 *b3;
+	float c2 = a3 *b1 - a1 *b3;
+	float c3 = -a2 *b1 + a1 *b2;
+
+	float un = sqrtf(c1*c1 + c2*c2 + c3*c3);
+
+	point result;
+	result.x = c1 / un;
+	result.y = c2 / un;
+	result.z = c3 / un;
+
+	return result;
+}
+
+point arithVector(bool isaPos, point a,bool isbPos, point b)
+{
+	point result;
+	float signA, signB;
+	if (isaPos)
+	{
+		signA = 1.f;
+	}
+	else
+	{
+		signA = -1.f;
+	}
+	if (isbPos)
+	{
+		signB = 1.f;
+	}
+	else
+	{
+		signB = -1.f;
+	}
+	result.x = signA*a.x + signB*b.x;
+	result.y = signA* a.y + signB*b.y;
+	result.z = signA*a.z + signB*b.z;
+
+	return result;
 }
 
 void menufunc(int value)
@@ -396,58 +739,66 @@ void keyboardbuttons(unsigned char c, int x, int y)
 	{
 		switch (c)
 		{
-		case 'p':
-		{
-			g_render = GL_POINTS;
-			trianglelines = false;
-			drawHeightMap();
-			break;
+			case 'p':
+			{
+				g_render = GL_POINTS;
+				trianglelines = false;
+				drawHeightMap();
+				break;
+			}
+			case 'l':
+			{
+				g_render = GL_LINES;
+				trianglelines = false;
+
+				drawHeightMap();
+				break;
+			}
+			case 't':
+			{
+				g_render = GL_TRIANGLE_STRIP;
+				trianglelines = false;
+
+				drawHeightMap();
+				break;
+			}
+			case 'h':
+			{
+				//returns "camera" to starting position
+				g_vLandRotate[0] = 0;
+				g_vLandRotate[1] = 0;
+				g_vLandRotate[2] = 0;
+
+				g_vLandTranslate[0] = 0;
+				g_vLandTranslate[1] = 0;
+				g_vLandTranslate[2] = 0;
+
+				g_vLandScale[0] = 1.0;
+				g_vLandScale[1] = 1.0;
+				g_vLandScale[2] = 1.0;
+
+				break;
+			}
+			case 'a': //starts recording screencaps for movie
+			{
+				startrecord();
+				break;
+			}
+			case 'b':
+			{
+				g_render = GL_TRIANGLE_STRIP;
+				trianglelines = true;
+				drawHeightMap();
+
+				break;
+			}
+			case'r':
+			{
+				printf("activating isRCrun\n");
+				isRCrun = true;
+				break;
+			}
 		}
-		case 'l':
-		{
-			g_render = GL_LINES;
-			trianglelines = false;
-
-			drawHeightMap();
-			break;
-		}
-		case 't':
-		{
-			g_render = GL_TRIANGLE_STRIP;
-			trianglelines = false;
-
-			drawHeightMap();
-			break;
-		}
-		case 'h':
-		{
-			//returns "camera" to starting position
-			g_vLandRotate[0] = 0;
-			g_vLandRotate[1] = 0;
-			g_vLandRotate[2] = 0;
-
-			g_vLandTranslate[0] = 0;
-			g_vLandTranslate[1] = 0;
-			g_vLandTranslate[2] = 0;
-
-			g_vLandScale[0] = 1.0;
-			g_vLandScale[1] = 1.0;
-			g_vLandScale[2] = 1.0;
-
-			break;
-		}
-		case 'a': //starts recording screencaps for movie
-			startrecord();
-			break;
-		case 'b':
-			g_render = GL_TRIANGLE_STRIP;
-			trianglelines = true;
-			drawHeightMap();
-
-			break;
-
-		}
-
 		break;
 	}
 	}
@@ -523,24 +874,6 @@ int loadSplines(char *argv) {
 	return 0;
 }
 
-point crSplines(float s,float u, point p1, point p2,point p3, point p4)
-{
-
-	point output;
-	float u2 = u*u;
-	float u3 = u*u*u;
-	float a = -s*u + 2.f * s*u*u- s*u*u*u;
-	float b = 1.f + (-3.f + s)*u*u + (2.f - s)*u*u*u;
-	float c = s*u + (3.f - 2.f* s)*u*u + (-2.f + s)*u*u*u;
-	float d = -s*u*u + s*u*u*u;
-
-	output.x = a*(float)p1.x + b*(float)p2.x + c*(float)p3.x + d*(float)p4.x;
-	output.y = a*(float)p1.y + b*(float)p2.y + c*(float)p3.y + d*(float)p4.y;
-	output.z = a*(float)p1.z + b*(float)p2.z + c*(float)p3.z + d*(float)p4.z;
-
-	return output;
-
-}
 
 int _tmain(int argc, _TCHAR* argv[])
 {
