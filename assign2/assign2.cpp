@@ -32,12 +32,17 @@ struct spline {
 };
 /* the spline array */
 struct spline *g_Splines;
-point crSplines(float s, float u, point p1, point p2, point p3, point p4);
+point crSplines(double s, double u, point p1, point p2, point p3, point p4);
 point getUnit(point p1, point p2);
+point getUnit(point p);
+point arithVector(double mult, bool isaPos, point a, bool isbPos, point b);
+
 void takeRide();
 point arithVector(bool isaPos, point a, bool isbPos, point b);
+point currentp, norm;
+double focusPx, focusPy, focusPz;
 
-point getTangent(float s, float u, point p1, point p2, point p3, point p4);
+point getTangent(double s, double u, point p1, point p2, point p3, point p4);
 
 void texload(int i, char *filename);
 /* total number of splines */
@@ -47,7 +52,7 @@ int g_iMenuId;
 
 bool isRCrun = false;
 int rideControlPoint=0;
-float rideFP=0.f;
+double rideFP=0.f;
 
 point rtan;
 point rp0, rp1, rp2, rp3;
@@ -58,9 +63,9 @@ int g_iLeftMouseButton = 0;    /* 1 if pressed, 0 if not */
 int g_iMiddleMouseButton = 0;
 int g_iRightMouseButton = 0;
 int framecount = 0;
-float xl = 0.f;
-float yl = 1.f;
-float zl = 0.f;
+double xl = 0.f;
+double yl = 1.f;
+double zl = 0.f;
 typedef enum { ROTATE, TRANSLATE, SCALE } CONTROLSTATE;
 bool recordstate;
 int frames = 0;
@@ -128,8 +133,7 @@ void drawHeightMap()
 void myinit()
 {
 	/* setup gl view here */
-	glGenTextures(1, texture);
-	texload(0, "bubble1.jpg");
+
 	glClearColor(0.0, 0.0, 0.0, 0.0);   // set background color
 	glEnable(GL_DEPTH_TEST);            // enable depth buffering
 	glShadeModel(GL_SMOOTH); // interpolate colors 
@@ -139,8 +143,8 @@ void myinit()
 	gluPerspective(60, 1, .01, 1000);
 
 	glMatrixMode(GL_MODELVIEW);
-
-	drawHeightMap();
+	glGenTextures(1, texture);
+	texload(0, "bubble1.jpg");
 
 }
 
@@ -201,62 +205,81 @@ void display()
 	rotation/translation/scaling */
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glMatrixMode(GL_MODELVIEW);
-//	glPushMatrix();
+	glPushMatrix();
 	glLoadIdentity(); // reset transformation
-
 	if (isRCrun) takeRide();
-	
-	glTranslatef(-g_vLandTranslate[0], -g_vLandTranslate[1], -g_vLandTranslate[2]);
+
+	glTranslatef(g_vLandTranslate[0], g_vLandTranslate[1], g_vLandTranslate[2]);
 	glRotatef(g_vLandRotate[0], 1, 0, 0);
 	glRotatef(g_vLandRotate[1], 0, 1, 0);
 	glRotatef(g_vLandRotate[2], 0, 0, 1);
 	glScalef(g_vLandScale[0], g_vLandScale[1], g_vLandScale[2]);
+
 	
+	bool bstart = false;
 	//enableLights();
-	float s=0.5f; 
+	double s=0.5; 
 	point buff;
 	point p0,p1,p2,p3; 
 	p0 = g_Splines->points[0];
 	glLineWidth(1.5f);
 
 	point n0, b0, b1, v, t0,v0,v1,v2,v3,v4,v5,v6,v7;
-	bool start = false;
 	v.x = 1.f;
-	v.y = 1.f;
-	v.z = 1.f;
+	v.y = 0.f;
+	v.z = 0.f;
 	t0 = getTangent(0.5f, 0, p0, g_Splines->points[0], g_Splines->points[1], g_Splines->points[2]);
 	n0 = getUnit(t0, v);
 	b0 = getUnit(t0, n0);
-	for (int i = 0; i < g_Splines->numControlPoints; i++)
+	//glBegin(GL_LINE_STRIP);
+
+	for (int j = 1; j <g_Splines[0].numControlPoints-2; j++)
 	{
+		//point buff = g_Splines[0].points[j];
+		p1 = g_Splines->points[j];
+		p2 = g_Splines->points[(j + 1) % (g_Splines->numControlPoints)];
+		p3 = g_Splines->points[(j + 2) % (g_Splines->numControlPoints )];
+		
+		
+		//glColor3f(1.0,1.0, 1.0);
 
-		p1 = g_Splines->points[i];
-		p2 = g_Splines->points[(i + 1) % g_Splines->numControlPoints];
-		p3 = g_Splines->points[(i + 2) % g_Splines->numControlPoints];
-		glBegin(GL_LINES);
-
-		for (float u = 0.f; u < 1.f; u += 0.1f)
+		//glVertex3f(buff.x, buff.y, buff.z);
+	
+		
+		for (double u = 0.0; u < 1.0; u += 0.1)
 		{
 
-
+			if (u > 1.0) break;
 	
 			
 			buff = crSplines(s, u, p0, p1, p2, p3);
 			t0 = getTangent(s, u, p0, p1, p2, p3);
+		//	t0 = getUnit(t0);
 			glColor3f(1.0,1.0, 1.0);
 			glVertex3f(buff.x, buff.y, buff.z);
-
+			/*
+			if (framecount == 1000)
+			{
+				printf("control point %d \n", rideControlPoint);
+				printf("buff is  at x: %f y: %f z: %f \n", buff.x, buff.y, buff.z);
+			}*/
 			n0 = getUnit(b0, t0);
 			b1 = getUnit(t0, n0);
-
-			if(start)
+			
+				
+			if(bstart)
 			{
-				v4 = arithVector(true,buff, true,  arithVector(true, n0, false, b0));
-				v5 = arithVector(true, buff, true, arithVector(true, n0, true, b0));
-				v6 = arithVector(true, buff, true, arithVector(false, n0, true, b0));
-				v7 = arithVector(true, buff, true, arithVector(false, n0, false, b0));
+				point prev4 = arithVector(0.05, true, n0, false, b1);
+				point prev5 = arithVector(0.05, true, n0, true, b1);
+				point prev6 = arithVector(0.05, false, n0, true, b1);
+				point prev7 = arithVector(0.05, false, n0, false, b1);
 
-				glBegin(GL_POLYGON);
+				v4 = arithVector(true, buff, true, prev4);
+				v5 = arithVector(true, buff, true, prev5);
+				v6 = arithVector(true, buff, true, prev6);
+				v7 = arithVector(true, buff, true, prev7);
+
+				glBegin(GL_QUADS);
 				glColor3f(1.0, 1.0, 1.0);
 				glVertex3f(v0.x, v0.y, v0.z);
 
@@ -270,9 +293,19 @@ void display()
 				glColor3f(1.0, 1.0, 1.0);
 				glVertex3f(v1.x, v1.y, v1.z);
 				glEnd();
+				
+				if (framecount == 1000)
+				{
+					printf("control point %d \n", rideControlPoint);
+					printf("buff is  at x: %f y: %f z: %f \n", buff.x, buff.y, buff.z);
 
+					printf("v1 is  at x: %f y: %f z: %f \n", v1.x, v1.y, v1.z);
+					//printf("v2 is  at x: %f y: %f z: %f \n", v2.x, v2.y, v2.z);
+					//printf("v3 is  at x: %f y: %f z: %f \n", v3.x, v3.y, v3.z);
 
+					//printf("v4 is  at x: %f y: %f z: %f \n", v4.x, v4.y, v4.z);
 
+				}
 				v0 = v4;
 				v1 = v5;
 				v2 = v6;
@@ -280,27 +313,26 @@ void display()
 			}
 			else
 			{
-				start = true;
+				bstart = true;
 
-				v4 = arithVector(true, buff, true, arithVector(true, n0, false, b0));
-				v5 = arithVector(true, buff, true, arithVector(true, n0, true, b0));
-				v6 = arithVector(true, buff, true, arithVector(false, n0, true, b0));
-				v7 = arithVector(true, buff, true, arithVector(false, n0, false, b0));
-
+				v4 = arithVector(true, buff, true, arithVector(true, n0, false, b1));
+				v5 = arithVector(true, buff, true, arithVector(true, n0, true, b1));
+				v6 = arithVector(true, buff, true, arithVector(false, n0, true, b1));
+				v7 = arithVector(true, buff, true, arithVector(false, n0, false, b1));
 				v0 = v4;
 				v1 = v5;
 				v2 = v6;
 				v3 = v7;
 			}
-
-
+			
+			
 
 		}
 		p0 = p1;
-		glEnd();
 
 
 	}
+	//glEnd();
 
 
 	glBegin(GL_LINES);
@@ -315,7 +347,7 @@ void display()
 	glBegin(GL_LINES);
 	glColor3f(0, 1.0, 0);
 	glVertex3f(0, 0, 0);
-	glColor3f(1.0, 1.0, 1.0);
+	glColor3f(0.0, 1.0, 0.0);
 	glVertex3f(100, 0, 0);
 	glEnd();
 
@@ -326,19 +358,19 @@ void display()
 	glColor3f(0, 0, 1.0);
 	glVertex3f(0, 100, 0);
 	glEnd();
-	glEndList();
+	glColor3f(1.0, 1.0, 1.0);
+
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, texture[0]);
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBegin(GL_POLYGON);
 	
 	glTexCoord2f(1.0, 0.0);
 	glVertex3f(5.0, 5.0, 5.0);
-
+	
 	glTexCoord2f(0.0, 0.0);
 	glVertex3f(-5.0, 5.0, 5.0);
 	
@@ -455,6 +487,7 @@ void display()
 
 	glDisable(GL_TEXTURE_2D);
 
+	glPopMatrix();
 	glutSwapBuffers();
 	record();
 
@@ -465,6 +498,18 @@ void takeRide()
 
 	point rtan;
 	float s = 0.5f;
+
+	
+	end = std::chrono::high_resolution_clock::now();
+	char myFilenm[2048];
+	std::chrono::duration<double> elapsed_seconds = end - start;
+	/*&if (elapsed_seconds.count() < 1.0 / 60.0 && currentp.x!=NULL) // does a capture every 1/30 of a second for 30 fps
+	{
+		start = std::chrono::high_resolution_clock::now();
+
+		gluLookAt(currentp.x, currentp.y, currentp.z, focusPx, focusPy, focusPz, norm.x, norm.y, norm.z);
+		return;
+	}*/
 	if (rideFP > 1.f)
 	{
 		rideControlPoint++;
@@ -492,20 +537,22 @@ void takeRide()
 	rp2 = g_Splines->points[(rideControlPoint + 1) % g_Splines->numControlPoints];
 	rp3 = g_Splines->points[(rideControlPoint + 2) % g_Splines->numControlPoints];
 
-	point currentp = crSplines(s, rideFP, rp0, rp1, rp2, rp3);
-	rtan = getTangent(s, rideFP, rp0, rp1, rp2, rp3);
+	currentp = crSplines(s, rideFP, rp0, rp1, rp2, rp3);
 
-	if (rideFP==0.5f)printf("current locatin is  %f %f %f \n", currentp.x, currentp.y, currentp.z);
+	printf("print spline location x: %f y: %f z: %f \n",currentp.x,currentp.y,currentp.z);
+	rtan = getTangent(s, rideFP, rp0, rp1, rp2, rp3);
+	rtan = getUnit(rtan);
+	//if (rideFP==0.5f)printf("current locatin is  %f %f %f \n", currentp.x, currentp.y, currentp.z);
 	point binormalNew, norm;
 
 
 	if (rideFP==0.0f && rideControlPoint == 0)
 	{
-		//printf("initializing \n");
+		printf("initializing \n");
 
 		point vec;
 		vec.x = 0.0;
-		vec.y = 1.0;
+		vec.y = 0.0;
 		vec.z = -1.0;
 		norm = getUnit(rtan, vec);
 		binormalNew = getUnit(rtan, norm);
@@ -519,45 +566,50 @@ void takeRide()
 	}
 	binormalOld = binormalNew;
 
-	float focusPx = currentp.x + 100.f*rtan.x;
-	float focusPy = currentp.y + 100.f*rtan.y;
-	float focusPz = currentp.z +100.f*rtan.z;
-
+	 focusPx = currentp.x + 10.f*rtan.x;
+	 focusPy = currentp.y + 10.f*rtan.y;
+	 focusPz = currentp.z +10.f*rtan.z;
+	
 	gluLookAt(currentp.x, currentp.y, currentp.z, focusPx, focusPy, focusPz, norm.x, norm.y, norm.z);
 
 
-	rideFP += 0.1f;
+	rideFP += 0.001f;
 	
 }
 
-point crSplines(float s, float u, point p1, point p2, point p3, point p4)
+point crSplines(double s, double u, point p1, point p2, point p3, point p4)
 {
 
 	point output;
-	float u2 = u*u;
-	float u3 = u*u*u;
-	float a = -s*u + 2.0f * s*u*u - s*u*u*u;
-	float b = 1.f + (-3.0f + s)*u*u + (2.0f - s)*u*u*u;
-	float c = s*u + (3.0f - 2.0f* s)*u*u + (-2.0f + s)*u*u*u;
-	float d = -s*u*u + s*u*u*u;
+	double u2 = u*u;
+	double u3 = u*u*u;
+	double a = -s*u + 2.0 * s*u*u - s*u*u*u;
+	double b = 1.0 + (-3.0 + s)*u*u + (2.0 - s)*u*u*u;
+	double c = s*u + (3.0 - 2.0* s)*u*u + (-2.0 + s)*u*u*u;
+	double d = -s*u*u + s*u*u*u;
 
-	output.x = (float)a*p1.x + (float)b*p2.x + (float)c*p3.x + (float)d*p4.x;
-	output.y = (float)a*p1.y + (float)b*p2.y + (float)c*p3.y + (float)d*p4.y;
-	output.z = (float)a*p1.z + (float)b*p2.z + (float)c*p3.z + (float)d*p4.z;
+	output.x = a*p1.x + b*p2.x + c*p3.x + d*p4.x;
+	output.y = a*p1.y + b*p2.y + c*p3.y + d*p4.y;
+	output.z = a*p1.z + b*p2.z + c*p3.z + d*p4.z;
 
+
+	if (framecount == 1000)
+	{
+		printf("output is at u: %f is x: %f y: %f z: %f \n",u, output.x, output.y, output.z);
+	}
 	return output;
 
 }
 
-point getTangent(float s, float u, point p1, point p2, point p3, point p4)
+point getTangent(double s, double u, point p1, point p2, point p3, point p4)
 {
 
 	point output;
-	float u2 = u*u;
-	float a = -3.f * u2 + 4.f * u*s - s;
-	float b = 3.f*u2*(2.f - s) + 2.f*u*(s - 3.f);
-	float c = 3.f*u2*(s - 2.f) + 2.f*u*(3.f - 2.f*s) + s;
-	float d = 3.f*u2 - 2.f*u*s;
+	double u2 = u*u;
+	double a = -3.f * u2 + 4.f * u*s - s;
+	double b = 3.f*u2*(2.f - s) + 2.f*u*(s - 3.f);
+	double c = 3.f*u2*(s - 2.f) + 2.f*u*(3.f - 2.f*s) + s;
+	double d = 3.f*u2 - 2.f*u*s;
 
 	output.x = a*p1.x +b*p2.x + c*p3.x + d*p4.x;
 	output.y = a*p1.y + b*p2.y + c*p3.y +d*p4.y;
@@ -567,22 +619,35 @@ point getTangent(float s, float u, point p1, point p2, point p3, point p4)
 
 }
 
+point getUnit(point p)
+{
+	double un = sqrtf(p.x*p.x+p.y*p.y+p.z*p.z);
+	
+	point result;
+	result.x = p.x / un;
+	result.y = p.y / un;
+	result.z = p.z / un;
+	return result;
+}
 point getUnit(point p1, point p2)
 {
-	float a1 = p1.x;
-	float a2 = p1.y;
-	float a3 = p1.z;
+	double a1 = p1.x;
+	double a2 = p1.y;
+	double a3 = p1.z;
 
-	float b1 = p2.x;
-	float b2 = p2.y;
-	float b3 = p2.z;
+	double b1 = p2.x;
+	double b2 = p2.y;
+	double b3 = p2.z;
 
-	float c1 = -a3 *b2 + a2 *b3;
-	float c2 = a3 *b1 - a1 *b3;
-	float c3 = -a2 *b1 + a1 *b2;
+	double c1 = -a3 *b2 + a2 *b3;
+	double c2 = a3 *b1 - a1 *b3;
+	double c3 = -a2 *b1 + a1 *b2;
 
-	float un = sqrtf(c1*c1 + c2*c2 + c3*c3);
-
+	double un = sqrtf(c1*c1 + c2*c2 + c3*c3);
+	if (un == 0)
+	{
+		//printf("un is zero ");
+	}
 	point result;
 	result.x = c1 / un;
 	result.y = c2 / un;
@@ -590,11 +655,40 @@ point getUnit(point p1, point p2)
 
 	return result;
 }
+point arithVector(double mult, bool isaPos, point a, bool isbPos, point b)
+{
+	point result;
+	double signA, signB;
+	if (isaPos)
+	{
+		signA = 1.f;
+	}
+	else
+	{
+		signA = -1.f;
+	}
+	if (isbPos)
+	{
+		signB = 1.f;
+	}
+	else
+	{
+		signB = -1.f;
+	}
+	result.x = signA*a.x + signB*b.x;
+	result.x = mult * result.x;
+	result.y = signA* a.y + signB*b.y;
+	result.y = mult * result.y;
 
+	result.z = signA*a.z + signB*b.z;
+	result.z = mult * result.z;
+
+	return result;
+}
 point arithVector(bool isaPos, point a,bool isbPos, point b)
 {
 	point result;
-	float signA, signB;
+	double signA, signB;
 	if (isaPos)
 	{
 		signA = 1.f;
@@ -885,6 +979,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (argc<2)
 	{  
 		printf ("usage: %s <trackfile>\n", argv[0]);
+		//sleep(1000);
 		exit(0);
 	}
 
