@@ -17,7 +17,8 @@
 #include <GL/glut.h>
 #include <chrono>
 #include <math.h>
-
+#include <limits> 
+#include <algorithm>
 /* represents one control point along the spline */
 struct point {
 	double x;
@@ -36,9 +37,12 @@ point crSplines(double s, double u, point p1, point p2, point p3, point p4);
 point getUnit(point p1, point p2);
 point getUnit(point p);
 point arithVector(double mult, bool isaPos, point a, bool isbPos, point b);
-
 void takeRide();
 point arithVector(bool isaPos, point a, bool isbPos, point b);
+void updateBorders(point p);
+
+double maxX, maxY, minX, minY, maxZ, minZ, skyBorder;
+
 point currentp, norm;
 double focusPx, focusPy, focusPz;
 
@@ -133,6 +137,13 @@ void drawHeightMap()
 void myinit()
 {
 	/* setup gl view here */
+	maxX = g_Splines->points[0].x;
+	maxY = g_Splines->points[0].y;
+	maxZ = g_Splines->points[0].z;
+
+	minX = g_Splines->points[0].x;
+	minY = g_Splines->points[0].y;
+	minZ = g_Splines->points[0].z;
 
 	glClearColor(0.0, 0.0, 0.0, 0.0);   // set background color
 	glEnable(GL_DEPTH_TEST);            // enable depth buffering
@@ -208,13 +219,13 @@ void display()
 	glPushMatrix();
 	glLoadIdentity(); // reset transformation
 	if (isRCrun) takeRide();
-
+	
 	glTranslatef(g_vLandTranslate[0], g_vLandTranslate[1], g_vLandTranslate[2]);
 	glRotatef(g_vLandRotate[0], 1, 0, 0);
 	glRotatef(g_vLandRotate[1], 0, 1, 0);
 	glRotatef(g_vLandRotate[2], 0, 0, 1);
 	glScalef(g_vLandScale[0], g_vLandScale[1], g_vLandScale[2]);
-
+	
 	
 	bool bstart = false;
 	//enableLights();
@@ -231,7 +242,7 @@ void display()
 	t0 = getTangent(0.5f, 0, p0, g_Splines->points[0], g_Splines->points[1], g_Splines->points[2]);
 	n0 = getUnit(t0, v);
 	b0 = getUnit(t0, n0);
-	//glBegin(GL_LINE_STRIP);
+	glBegin(GL_LINE_STRIP);
 
 	for (int j = 1; j <g_Splines[0].numControlPoints-2; j++)
 	{
@@ -254,6 +265,7 @@ void display()
 			
 			buff = crSplines(s, u, p0, p1, p2, p3);
 			t0 = getTangent(s, u, p0, p1, p2, p3);
+			updateBorders(buff);
 		//	t0 = getUnit(t0);
 			glColor3f(1.0,1.0, 1.0);
 			glVertex3f(buff.x, buff.y, buff.z);
@@ -265,7 +277,7 @@ void display()
 			}*/
 			n0 = getUnit(b0, t0);
 			b1 = getUnit(t0, n0);
-			
+			/*
 				
 			if(bstart)
 			{
@@ -293,6 +305,58 @@ void display()
 				glColor3f(1.0, 1.0, 1.0);
 				glVertex3f(v1.x, v1.y, v1.z);
 				glEnd();
+
+				//lower quad
+				glBegin(GL_QUADS);
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v1.x, v1.y, v1.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v5.x, v5.y, v5.z);
+
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v6.x, v6.y, v6.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v2.x, v2.y, v2.z);
+				glEnd();
+
+
+
+				
+				glBegin(GL_QUADS);
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v2.x, v2.y, v2.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v6.x, v6.y, v6.z);
+
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v7.x, v7.y, v7.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v3.x, v3.y, v3.z);
+				glEnd();
+
+				
+
+				glBegin(GL_QUADS);
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v3.x, v3.y, v3.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v7.x, v7.y, v7.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v4.x, v4.y, v4.z);
+
+				glColor3f(1.0, 1.0, 1.0);
+				glVertex3f(v0.x, v0.y, v0.z);
+				glEnd();
+
+				
 				
 				if (framecount == 1000)
 				{
@@ -315,10 +379,10 @@ void display()
 			{
 				bstart = true;
 
-				v4 = arithVector(true, buff, true, arithVector(true, n0, false, b1));
-				v5 = arithVector(true, buff, true, arithVector(true, n0, true, b1));
-				v6 = arithVector(true, buff, true, arithVector(false, n0, true, b1));
-				v7 = arithVector(true, buff, true, arithVector(false, n0, false, b1));
+				v4 = arithVector(true, buff, true, arithVector(0.05, true, n0, false, b1));
+				v5 = arithVector(true, buff, true, arithVector(0.05, true, n0, true, b1));
+				v6 = arithVector(true, buff, true, arithVector(0.05, false, n0, true, b1));
+				v7 = arithVector(true, buff, true, arithVector(0.05, false, n0, false, b1));
 				v0 = v4;
 				v1 = v5;
 				v2 = v6;
@@ -326,13 +390,14 @@ void display()
 			}
 			
 			
-
+			*/
 		}
 		p0 = p1;
 
 
 	}
-	//glEnd();
+	glEnd();
+
 
 
 	glBegin(GL_LINES);
@@ -369,16 +434,16 @@ void display()
 	glBegin(GL_POLYGON);
 	
 	glTexCoord2f(1.0, 0.0);
-	glVertex3f(5.0, 5.0, 5.0);
+	glVertex3f(skyBorder, skyBorder, skyBorder);
 	
 	glTexCoord2f(0.0, 0.0);
-	glVertex3f(-5.0, 5.0, 5.0);
+	glVertex3f(-skyBorder, skyBorder, skyBorder);
 	
 	glTexCoord2f(0.0, 1.0);
-	glVertex3f(-5.0, 5.0, -5.0);
+	glVertex3f(-skyBorder, skyBorder, -skyBorder);
 
 	glTexCoord2f(1.0, 1.0);
-	glVertex3f(5.0, 5.0, -5.0);
+	glVertex3f(skyBorder, skyBorder, -skyBorder);
 	
 	glEnd();
 
@@ -389,18 +454,19 @@ void display()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBegin(GL_POLYGON);
 
+
+
 	glTexCoord2f(1.0, 0.0);
-	glVertex3f(5.0, -5.0, 5.0);
+	glVertex3f(skyBorder, -skyBorder, skyBorder);
 
 	glTexCoord2f(0.0, 0.0);
-	glVertex3f(-5.0, -5.0, 5.0);
+	glVertex3f(-skyBorder, -skyBorder, skyBorder);
 
 	glTexCoord2f(0.0, 1.0);
-	glVertex3f(-5.0, -5.0, -5.0);
+	glVertex3f(-skyBorder, -skyBorder, -skyBorder);
 
 	glTexCoord2f(1.0, 1.0);
-	glVertex3f(5.0, -5.0, -5.0);
-
+	glVertex3f(skyBorder, -skyBorder, -skyBorder);
 	glEnd();
 
 
@@ -410,18 +476,20 @@ void display()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBegin(GL_POLYGON);
 
+
+
+
 	glTexCoord2f(1.0, 0.0);
-	glVertex3f(5.0, 5.0, 5.0);
+	glVertex3f(skyBorder, skyBorder, skyBorder);
 
 	glTexCoord2f(0.0, 0.0);
-	glVertex3f(5.0, 5.0, -5.0);
+	glVertex3f(skyBorder, skyBorder, -skyBorder);
 
 	glTexCoord2f(0.0, 1.0);
-	glVertex3f(5.0, -5.0, -5.0);
+	glVertex3f(skyBorder, -skyBorder, -skyBorder);
 
 	glTexCoord2f(1.0, 1.0);
-	glVertex3f(5.0, -5.0, 5.0);
-
+	glVertex3f(skyBorder, -skyBorder, skyBorder);
 	glEnd();
 
 		glBindTexture(GL_TEXTURE_2D, texture[0]);
@@ -430,17 +498,19 @@ void display()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBegin(GL_POLYGON);
 
+
+
 	glTexCoord2f(1.0, 0.0);
-	glVertex3f(-5.0, 5.0, 5.0);
+	glVertex3f(-skyBorder, skyBorder, skyBorder);
 
 	glTexCoord2f(0.0, 0.0);
-	glVertex3f(-5.0, 5.0, -5.0);
+	glVertex3f(-skyBorder, skyBorder, -skyBorder);
 
 	glTexCoord2f(0.0, 1.0);
-	glVertex3f(-5.0, -5.0, -5.0);
+	glVertex3f(-skyBorder, -skyBorder, -skyBorder);
 
 	glTexCoord2f(1.0, 1.0);
-	glVertex3f(-5.0, -5.0, 5.0);
+	glVertex3f(-skyBorder, -skyBorder, skyBorder);
 
 	glEnd();
 
@@ -450,18 +520,19 @@ void display()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBegin(GL_POLYGON);
 
+
+
 	glTexCoord2f(1.0, 0.0);
-	glVertex3f(5.0, 5.0, 5.0);
+	glVertex3f(skyBorder, skyBorder, skyBorder);
 
 	glTexCoord2f(0.0, 0.0);
-	glVertex3f(-5.0, 5.0, 5.0);
+	glVertex3f(-skyBorder, skyBorder, skyBorder);
 
 	glTexCoord2f(0.0, 1.0);
-	glVertex3f(-5.00, -5.0, 5.0);
+	glVertex3f(-skyBorder, -skyBorder, skyBorder);
 
 	glTexCoord2f(1.0, 1.0);
-	glVertex3f(5.0, -5.0, 5.0);
-
+	glVertex3f(skyBorder, -skyBorder, skyBorder);
 	glEnd();
 
 
@@ -471,18 +542,19 @@ void display()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBegin(GL_POLYGON);
 
+
+
 	glTexCoord2f(1.0, 0.0);
-	glVertex3f(5.0, 5.0, -5.0);
+	glVertex3f(skyBorder, skyBorder, -skyBorder);
 
 	glTexCoord2f(0.0, 0.0);
-	glVertex3f(-5.0, 5.0, -5.0);
+	glVertex3f(-skyBorder, skyBorder, -skyBorder);
 
 	glTexCoord2f(0.0, 1.0);
-	glVertex3f(-5.0, -5.0, -5.0);
+	glVertex3f(-skyBorder, -skyBorder, -skyBorder);
 
 	glTexCoord2f(1.0, 1.0);
-	glVertex3f(5.0, -5.0, -5.0);
-
+	glVertex3f(skyBorder, -skyBorder, -skyBorder);
 	glEnd();
 
 	glDisable(GL_TEXTURE_2D);
@@ -510,7 +582,7 @@ void takeRide()
 		gluLookAt(currentp.x, currentp.y, currentp.z, focusPx, focusPy, focusPz, norm.x, norm.y, norm.z);
 		return;
 	}*/
-	if (rideFP > 1.f)
+	if (rideFP >= 1.0)
 	{
 		rideControlPoint++;
 		rideFP = 0.0f;
@@ -573,7 +645,7 @@ void takeRide()
 	gluLookAt(currentp.x, currentp.y, currentp.z, focusPx, focusPy, focusPz, norm.x, norm.y, norm.z);
 
 
-	rideFP += 0.001f;
+	rideFP += 0.001;
 	
 }
 
@@ -712,6 +784,55 @@ point arithVector(bool isaPos, point a,bool isbPos, point b)
 	return result;
 }
 
+void updateBorders(point p)
+{
+	if (p.x > maxX)
+	{
+		maxX = p.x;
+	}
+	if (p.x < minX)
+	{
+		minX = p.x;
+	}
+
+
+	if (p.y > maxY)
+	{
+		maxY = p.y;
+	}
+	if (p.y < minY)
+	{
+		minY = p.y;
+	}
+
+
+	if (p.z > maxZ)
+	{
+		maxZ = p.z;
+	}
+	if (p.z < minZ)
+	{
+		minZ = p.z;
+	}
+
+	double borderX = abs(maxX - minX);
+	double borderY = abs(maxY - minY);
+	double borderZ = abs(maxZ - minZ);
+
+	if (borderX > borderY && borderX > borderZ)
+	{
+		skyBorder = 10 * borderX;
+	}
+	else if (borderZ > borderY && borderZ > borderX)
+	{
+		skyBorder = 10 * borderZ;
+	}
+	else
+	{
+		skyBorder = 10 * borderY;
+
+	}
+}
 void menufunc(int value)
 {
 	switch (value)
